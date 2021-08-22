@@ -107,7 +107,15 @@ List<int> _parseList(var samples) {
 // The following is needed for 16bit PCM transmission, as I can only transmit byte arrays from java to dart
 // This function then squashes two bytes together to one short
 Stream<List<int>> _squashStream(Stream audio, String type) {
-  return _cast(audio.map(_squashList), type);
+  return audio.map(_squashList);
+  // switch (type) { case "List<int>":
+  //     return audio.map(_squashList);
+  //     break;
+  //   case "int":
+  //     return audio.map(_squashList).expand((element) => element);
+  //   default:
+  //     throw (Exception("Unsupported Type. Only int and List<int> are supported"));
+  // }
 }
 
 // If someone reading this has a suggestion to do this more efficiently, let me know
