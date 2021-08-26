@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:core';
+import 'package:audioplayers/audioplayers.dart';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +11,7 @@ import 'package:flutter/animation.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:mic_stream/mic_stream.dart';
+import 'package:path_provider/path_provider.dart';
 
 enum Command {
   start,
@@ -95,13 +99,92 @@ class _MicStreamExampleAppState extends State<MicStreamExampleApp>
     if (!isRecording) return false;
     print("Stop Listening to the microphone");
     listener.cancel();
-
-    setState(() {
-      isRecording = false;
-      currentSamples = null;
-      startTime = null;
+    save(currentSamples, 16000).then((value) {
+      setState(() {
+        isRecording = false;
+        currentSamples = null;
+        startTime = null;
+      });
     });
+
     return true;
+  }
+
+Future<String> get _localPath async {
+   final directory = await getApplicationDocumentsDirectory();
+  // return "/mic_stream";
+
+
+   return directory.path;
+}
+Future<File> get _localFile async {
+  final path = await _localPath;
+  print("Directory where recording is stored:" + path.toString());
+  return File('$path/recordedFile.wav');
+}
+  Future<void> save(List<int> data, int sampleRate) async {
+    File recordedFile = await _localFile;
+
+    var channels = 1;
+
+    int byteRate = ((16 * sampleRate * channels) / 8).round();
+
+    if(data == null)
+      return;
+
+    var size = data.length;
+
+    var fileSize = size + 36;
+
+    Uint8List header = Uint8List.fromList([
+      // "RIFF"
+      82, 73, 70, 70,
+      fileSize & 0xff,
+      (fileSize >> 8) & 0xff,
+      (fileSize >> 16) & 0xff,
+      (fileSize >> 24) & 0xff,
+      // WAVE
+      87, 65, 86, 69,
+      // fmt
+      102, 109, 116, 32,
+      // fmt chunk size 16
+      16, 0, 0, 0,
+      // Type of format
+      1, 0,
+      // One channel
+      channels, 0,
+      // Sample rate
+      sampleRate & 0xff,
+      (sampleRate >> 8) & 0xff,
+      (sampleRate >> 16) & 0xff,
+      (sampleRate >> 24) & 0xff,
+      // Byte rate
+      byteRate & 0xff,
+      (byteRate >> 8) & 0xff,
+      (byteRate >> 16) & 0xff,
+      (byteRate >> 24) & 0xff,
+      // Uhm
+      ((16 * channels) / 8).round(), 0,
+      // bitsize
+      16, 0,
+      // "data"
+      100, 97, 116, 97,
+      size & 0xff,
+      (size >> 8) & 0xff,
+      (size >> 16) & 0xff,
+      (size >> 24) & 0xff,
+      ...data
+    ]);
+    print(recordedFile.existsSync());
+    print(recordedFile.path);
+    recordedFile.writeAsBytesSync(header, flush: true);
+    AudioPlayer audioPlayer = AudioPlayer();
+    int result = await audioPlayer.play(recordedFile.path, isLocal: true);
+    print("result"+ result.toString());
+
+    print(recordedFile.readAsBytesSync());
+    return;
+
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
@@ -273,4 +356,5 @@ class Statistics extends StatelessWidget {
               : "Not recording"))),
     ]);
   }
+
 }
